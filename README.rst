@@ -13,13 +13,13 @@ urlnorm normalizes a URL by:
   * unquoting any % escaped characters (where possible)
 
 Installation
-============
+------------
 
     pip install urlnorm
 
 
 Example
-=======
+-------
 
     >>> import urlnorm
     >>> urlnorm.norm("http://xn--q-bga.com./u/u/../%72/l/")
