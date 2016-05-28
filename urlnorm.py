@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
-
-"""
+'''
 urlnorm.py - URL normalization routines
 
 urlnorm normalizes a URL by:
@@ -13,7 +12,7 @@ urlnorm normalizes a URL by:
   * unescaping any percent escape sequences (where possible)
   * upercase percent escape (ie: %3f => %3F)
   * converts spaces to %20
-  * converts ip encoded as an integer to dotted quad notation 
+  * converts ip encoded as an integer to dotted quad notation
 
 Available functions:
   norm - given a URL (string), returns a normalized URL
@@ -26,6 +25,7 @@ Available functions:
 
 
 CHANGES:
+1.1.5 - Python 3 and modernization
 1.1.4 - unescape " " in params, query string, and fragments
 1.1.3 - don't escape " " in path
 1.1.2 - leave %20 as %20, collate ' ' to %20, leave '+' as '+'
@@ -38,71 +38,67 @@ CHANGES:
 0.92 - unknown schemes now pass the port through silently
 0.91 - general cleanup
      - changed dictionaries to lists where appropriate
-     - more fine-grained authority parsing and normalisation    
-"""
+     - more fine-grained authority parsing and normalisation
+'''
+from __future__ import unicode_literals
 
-__license__ = """
-Copyright (c) 1999-2002 Mark Nottingham <mnot@pobox.com>
-Copyright (c) 2010 Jehiah Czebotar <jehiah@gmail.com>
+import re
+try:
+    from urllib.parse import urlparse, urlunparse
+except ImportError:
+    from urlparse import urlparse, urlunparse
+try:
+    from string import ascii_lowercase as lower
+except ImportError:
+    from string import lower
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-"""
 
 # also update in setup.py
-__version__ = "1.1.4"
-
-from urlparse import urlparse, urlunparse
-from string import lower
-import re
+__title__ = 'urlnorm'
+__description__ = 'Normalize a URL to a standard unicode encoding'
+__version_str__ = '2.0.0'
+__version__ = tuple([int(ver_i.split('-')[0]) for ver_i in __version_str__.split('.')])
+__license__ = 'MIT'
+__url__ = 'https://github.com/jehiah/urlnorm'
+__author__ = 'Jehiah Czebotar'
+__author_email__ = 'ehiah@gmail.com'
+__copyright__ = 'Copyright 1999-2002, 2010'
 
 
 class InvalidUrl(Exception):
     pass
 
+_collapse = re.compile('([^/]+/\.\./?|/\./|//|/\.$|/\.\.$)')
 _server_authority = re.compile('^(?:([^\@]+)\@)?([^\:\[\]]+|\[[a-fA-F0-9\:\.]+\])(?:\:(.*?))?$')
-_default_port = {'http': '80',
-                 'itms': '80',
-                 'ws': '80',
-                 'https': '443',
-                 'wss': '443',
-                 'gopher': '70',
-                 'news': '119',
-                 'snews': '563',
-                 'nntp': '119',
-                 'snntp': '563',
-                 'ftp': '21',
-                 'telnet': '23',
-                 'prospero': '191',
-                 }
-_relative_schemes = set(['http',
-                         'https',
-                         'ws',
-                         'wss',
-                         'itms',
-                         'news',
-                         'snews',
-                         'nntp',
-                         'snntp',
-                         'ftp',
-                         'file',
-                         ''
-                         ])
+_default_port = {
+    'http': '80',
+    'itms': '80',
+    'ws': '80',
+    'https': '443',
+    'wss': '443',
+    'gopher': '70',
+    'news': '119',
+    'snews': '563',
+    'nntp': '119',
+    'snntp': '563',
+    'ftp': '21',
+    'telnet': '23',
+    'prospero': '191',
+}
+_relative_schemes = [
+    'http',
+    'https',
+    'ws',
+    'wss',
+    'itms',
+    'news',
+    'snews',
+    'nntp',
+    'snntp',
+    'ftp',
+    'file',
+    ''
+]
 
 params_unsafe_list = set('?=+%#;')
 qs_unsafe_list = set('?&=+%#')
@@ -129,11 +125,11 @@ def unquote_fragment(s):
 
 
 def unquote_safe(s, unsafe_list):
-    """unquote percent escaped string except for percent escape sequences that are in unsafe_list"""
+    '''unquote percent escaped string except for percent escape sequences that are in unsafe_list'''
     # note: this build utf8 raw strings ,then does a .decode('utf8') at the end.
     # as a result it's doing .encode('utf8') on each block of the string as it's processed.
     res = _utf8(s).split('%')
-    for i in xrange(1, len(res)):
+    for i in range(1, len(res)):
         item = res[i]
         try:
             raw_chr = _hextochr[item[:2]]
@@ -146,20 +142,21 @@ def unquote_safe(s, unsafe_list):
             res[i] = '%' + item
         except UnicodeDecodeError:
             # note: i'm not sure what this does
-            res[i] = unichr(int(item[:2], 16)) + item[2:]
+            res[i] = chr(int(item[:2], 16)) + item[2:]
     o = "".join(res)
     return _unicode(o)
 
 
 def norm(url):
-    """given a string URL, return its normalized/unicode form"""
+    '''given a string URL, return its normalized/unicode form'''
     url = _unicode(url)  # operate on unicode strings
     url_tuple = urlparse(url)
     normalized_tuple = norm_tuple(*url_tuple)
     return urlunparse(normalized_tuple)
 
+
 def norm_tuple(scheme, authority, path, parameters, query, fragment):
-    """given individual url components, return its normalized form"""
+    '''given individual url components, return its normalized form'''
     scheme = lower(scheme)
     if not scheme:
         raise InvalidUrl('missing URL scheme')
@@ -178,32 +175,18 @@ def norm_tuple(scheme, authority, path, parameters, query, fragment):
 
 def norm_path(scheme, path):
     if scheme in _relative_schemes:
-        # resolve `/../` and `/./` and `//` components in path as appropriate
-        i = 0
-        parts = []
-        start = 0
-        while i < len(path):
-            if path[i] == "/" or i == len(path) - 1:
-                chunk = path[start:i+1]
-                start = i + 1
-                if chunk in ["", "/", ".", "./"]:
-                    # do nothing
-                    pass
-                elif chunk in ["..", "../"]:
-                    if len(parts):
-                        parts = parts[:len(parts)-1]
-                    else:
-                        parts.append(chunk)
-                else:
-                    parts.append(chunk)
-            i+=1
-        path = "/"+ ("".join(parts))
+        last_path = path
+        while 1:
+            path = _collapse.sub('/', path, 1)
+            if last_path == path:
+                break
+            last_path = path
     path = unquote_path(path)
     if not path:
         return '/'
     return path
 
-MAX_IP = 0xffffffffL
+MAX_IP = 0xffffffff
 
 
 def int2ip(ipnum):
@@ -260,14 +243,10 @@ def _idn(subdomain):
 
 
 def _utf8(value):
-    if isinstance(value, unicode):
-        return value.encode("utf-8")
-    assert isinstance(value, str)
+    value = value.encode('utf-8')
     return value
 
 
 def _unicode(value):
-    if isinstance(value, str):
-        return value.decode("utf-8")
-    assert isinstance(value, unicode)
+    value = value.decode('utf-8')
     return value
